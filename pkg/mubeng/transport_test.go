@@ -17,10 +17,17 @@ func TestTransport(t *testing.T) {
 
 	failProxy := "gopher://localhost:70"
 	httpProxy := "http://localhost:80"
+	httpsProxy := "https://localhost:443"
 	socks4Proxy := "socks4://localhost:5678"
 	socks5Proxy := "socks5://localhost:3128"
+	awsProxy := "aws://AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY@ap-southeast-1"
 
 	httpURL, err := url.Parse(httpProxy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	httpsURL, err := url.Parse(httpsProxy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,9 +45,7 @@ func TestTransport(t *testing.T) {
 	}{
 		{
 			name: "Switch-transport to HTTP",
-			args: args{
-				p: httpProxy,
-			},
+			args: args{p: httpProxy},
 			wantTr: &http.Transport{
 				Proxy:             http.ProxyURL(httpURL),
 				DisableKeepAlives: true,
@@ -49,10 +54,18 @@ func TestTransport(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Switch-transport to SOCKSv5",
-			args: args{
-				p: socks5Proxy,
+			name: "Switch-transport to HTTPS",
+			args: args{p: httpProxy},
+			wantTr: &http.Transport{
+				Proxy:             http.ProxyURL(httpsURL),
+				DisableKeepAlives: true,
+				TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 			},
+			wantErr: false,
+		},
+		{
+			name: "Switch-transport to SOCKSv5",
+			args: args{p: socks5Proxy},
 			wantTr: &http.Transport{
 				Dial:              socks.Dial(socks5Proxy),
 				DisableKeepAlives: true,
@@ -62,9 +75,7 @@ func TestTransport(t *testing.T) {
 		},
 		{
 			name: "Switch-transport to SOCKSv4",
-			args: args{
-				p: socks4Proxy,
-			},
+			args: args{p: socks4Proxy},
 			wantTr: &http.Transport{
 				Dial:              socks.Dial(socks4Proxy),
 				DisableKeepAlives: true,
@@ -73,11 +84,15 @@ func TestTransport(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Unsupported proxy proxy protocol scheme",
-			args: args{
-				p: failProxy,
-			},
+			name:    "Unsupported proxy proxy protocol scheme",
+			args:    args{p: failProxy},
 			wantTr:  nil,
+			wantErr: true,
+		},
+		{
+			name:    "AWS proxy protocol scheme",
+			args:    args{p: awsProxy},
+			wantTr:  new(http.Transport),
 			wantErr: true,
 		},
 	}

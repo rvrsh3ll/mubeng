@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/mubeng/mubeng/internal/runner"
 	"github.com/projectdiscovery/gologger"
-	"ktbs.dev/mubeng/internal/runner"
 )
 
 func main() {

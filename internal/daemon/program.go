@@ -1,6 +1,6 @@
 package daemon
 
-import "ktbs.dev/mubeng/common"
+import "github.com/mubeng/mubeng/common"
 
 type program struct {
 	opt *common.Options
