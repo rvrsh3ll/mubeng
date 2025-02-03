@@ -2,22 +2,30 @@ package proxymanager
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"time"
 
-	"ktbs.dev/mubeng/pkg/mubeng"
+	"github.com/mubeng/mubeng/pkg/helper"
+	"github.com/mubeng/mubeng/pkg/mubeng"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // ProxyManager defines the proxy list and current proxy position
 type ProxyManager struct {
-	Proxies      []string
 	CurrentIndex int
+	filepath     string
+	Length       int
+	Proxies      []string
+}
+
+func init() {
+	// TODO(dwisiswant0): deprecated, update this later.
+	// nolint: staticcheck
+	rand.Seed(time.Now().UnixNano())
+
+	manager = &ProxyManager{CurrentIndex: -1}
 }
 
 // New initialize ProxyManager
@@ -30,40 +38,27 @@ func New(filename string) (*ProxyManager, error) {
 	}
 	defer file.Close()
 
-	manager := &ProxyManager{}
-	manager.CurrentIndex = -1
+	manager.Proxies = []string{}
+	manager.filepath = filename
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		proxy := scanner.Text()
+		proxy := helper.Eval(scanner.Text())
 		if _, value := keys[proxy]; !value {
-			if _, err = mubeng.Transport(proxy); err == nil {
+			proxy := placeholder.ReplaceAllString(proxy, "")
+			_, err = mubeng.Transport(proxy)
+			if err == nil || errors.Is(err, mubeng.ErrSwitchTransportAWSProtocolScheme) {
 				keys[proxy] = true
 				manager.Proxies = append(manager.Proxies, proxy)
 			}
 		}
 	}
 
-	if len(manager.Proxies) < 1 {
+	manager.Count()
+
+	if manager.Length < 1 {
 		return manager, fmt.Errorf("open %s: has no valid proxy URLs", filename)
 	}
 
 	return manager, scanner.Err()
-}
-
-// NextProxy will navigate the next proxy to use
-func (p *ProxyManager) NextProxy() string {
-	p.CurrentIndex++
-	if p.CurrentIndex > len(p.Proxies)-1 {
-		p.CurrentIndex = 0
-	}
-
-	proxy := p.Proxies[p.CurrentIndex]
-
-	return proxy
-}
-
-// RandomProxy will choose a proxy randomly from the list
-func (p *ProxyManager) RandomProxy() string {
-	return p.Proxies[rand.Intn(len(p.Proxies))]
 }

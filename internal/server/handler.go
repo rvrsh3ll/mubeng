@@ -2,15 +2,21 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/elazarl/goproxy"
-	"ktbs.dev/mubeng/common"
-	"ktbs.dev/mubeng/pkg/mubeng"
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mubeng/mubeng/common"
+	"github.com/mubeng/mubeng/internal/proxygateway"
+	"github.com/mubeng/mubeng/pkg/helper/awsurl"
+	"github.com/mubeng/mubeng/pkg/mubeng"
 )
 
 // onRequest handles client request
@@ -20,77 +26,100 @@ func (p *Proxy) onRequest(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Reque
 		defer mutex.Unlock()
 	}
 
-	// Rotate proxy IP for every AFTER request
-	if (rotate == "") || (ok >= p.Options.Rotate) {
-		if p.Options.Method == "sequent" {
-			rotate = p.Options.ProxyManager.NextProxy()
-		}
-
-		if p.Options.Method == "random" {
-			rotate = p.Options.ProxyManager.RandomProxy()
-		}
-
-		if ok >= p.Options.Rotate {
-			ok = 1
-		}
-	} else {
-		ok++
+	if (req.URL.Scheme != "http") && (req.URL.Scheme != "https") {
+		return req, serverErr(req)
 	}
 
-	resChan := make(chan *http.Response)
-	errChan := make(chan error, 1)
+	resChan := make(chan interface{})
 
-	go func() {
-		if (req.URL.Scheme != "http") && (req.URL.Scheme != "https") {
-			errChan <- fmt.Errorf("Unsupported protocol scheme: %s", req.URL.Scheme)
+	go func(r *http.Request) {
+		log.Debugf("%s %s %s", r.RemoteAddr, r.Method, r.URL)
+
+		i := 0
+		for {
+			proxy := p.rotateProxy()
+
+			retryablehttpClient, err := p.getClient(r, proxy)
+			if err != nil {
+				resChan <- err
+
+				return
+			}
+
+			retryablehttpRequest, err := retryablehttp.FromRequest(r)
+			if err != nil {
+				resChan <- err
+
+				return
+			}
+
+			resp, err := retryablehttpClient.Do(retryablehttpRequest)
+			if err != nil {
+				if i >= p.Options.MaxErrors && p.Options.MaxErrors >= 0 {
+					resChan <- err
+
+					return
+				}
+
+				if p.Options.RemoveOnErr {
+					p.removeProxy(proxy)
+
+					log.Debugf(
+						"%s Removing proxy IP from proxy pool [proxies=%q]",
+						r.RemoteAddr, fmt.Sprint(p.Options.ProxyManager.Count()),
+					)
+				}
+
+				if p.Options.RotateOnErr && (i < p.Options.MaxErrors || p.Options.MaxErrors <= 0) {
+					remaining := fmt.Sprint(p.Options.MaxErrors - i)
+					if p.Options.MaxErrors <= 0 {
+						remaining = "∞"
+					}
+
+					log.Debugf(
+						"%s Retrying (rotated) %s %s [remaining=%q]",
+						r.RemoteAddr, r.Method, r.URL, remaining,
+					)
+
+					i++
+
+					continue
+				} else {
+					resChan <- err
+
+					return
+				}
+			}
+			defer resp.Body.Close()
+
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				resChan <- err
+
+				return
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(buf))
+
+			resChan <- resp
+
 			return
 		}
+	}(req)
 
-		log.Debugf("%s %s %s", req.RemoteAddr, req.Method, req.URL)
+	var resp *http.Response
 
-		tr, err := mubeng.Transport(rotate)
-		if err != nil {
-			errChan <- err
-			return
-		}
-
-		proxy := &mubeng.Proxy{
-			Address:   rotate,
-			Transport: tr,
-		}
-
-		client, req = proxy.New(req)
-		client.Timeout = p.Options.Timeout
-		if p.Options.Verbose {
-			client.Transport = dump.RoundTripper(tr)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		defer resp.Body.Close()
-
-		// Copying response body
-		buf, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			errChan <- err
-			return
-		}
-
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(buf))
-		resChan <- resp
-	}()
-
-	select {
-	case err := <-errChan:
-		log.Errorf("%s %s", req.RemoteAddr, err)
-		return req, goproxy.NewResponse(req, mime, http.StatusBadGateway, "Proxy server error")
-	case resp := <-resChan:
+	res := <-resChan
+	switch res := res.(type) {
+	case *http.Response:
+		resp = res
 		log.Debug(req.RemoteAddr, " ", resp.Status)
-		return req, resp
+	case error:
+		err := res
+		log.Errorf("%s %s", req.RemoteAddr, err)
+		resp = serverErr(req)
 	}
+
+	return req, resp
 }
 
 // onConnect handles CONNECT method
@@ -131,6 +160,126 @@ func (p *Proxy) onResponse(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Res
 	return resp
 }
 
+func (p *Proxy) rotateProxy() string {
+	var proxy string
+	var err error
+
+	if ok >= p.Options.Rotate {
+		proxy, err = p.Options.ProxyManager.Rotate(p.Options.Method)
+		if err != nil {
+			log.Fatalf("Could not rotate proxy IP: %s", err)
+		}
+
+		if ok >= p.Options.Rotate {
+			ok = 1
+		}
+	} else {
+		ok++
+	}
+
+	return proxy
+}
+
+func (p *Proxy) removeProxy(target string) {
+	err := p.Options.ProxyManager.RemoveProxy(target)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func (p *Proxy) getClient(req *http.Request, proxyAddr string) (*retryablehttp.Client, error) {
+	tr, err := mubeng.Transport(proxyAddr)
+	if err != nil && !errors.Is(err, mubeng.ErrSwitchTransportAWSProtocolScheme) {
+		return nil, err
+	}
+
+	proxy := &mubeng.Proxy{
+		Address:      proxyAddr,
+		MaxRedirects: p.Options.MaxRedirects,
+		Timeout:      p.Options.Timeout,
+		Transport:    tr,
+	}
+
+	client, err := proxy.New(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if awsurl.IsURL(proxyAddr) {
+		var pg *proxygateway.ProxyGateway
+
+		awsURL, err := awsurl.Parse(proxyAddr)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = awsURL.Credentials("")
+		if err != nil {
+			return nil, err
+		}
+
+		accessKeyID := awsURL.AccessKeyID
+		secretAccessKey := awsURL.SecretAccessKey
+		region := awsURL.Region
+
+		baseURL, _, err := proxygateway.GetBaseURL(req.URL.String())
+		if err != nil {
+			return nil, err
+		}
+
+		gatewayKey := getGatewayKey(baseURL, region)
+
+		if p.Gateways[gatewayKey] == nil {
+			ctx := context.Background()
+			gateway, err := proxygateway.New(ctx, accessKeyID, secretAccessKey, region)
+			if err != nil {
+				return nil, err
+			}
+
+			err = gateway.SetBaseURL(baseURL)
+			if err != nil {
+				return nil, err
+			}
+
+			err = gateway.Start(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			pg = gateway
+
+			p.mu.Lock()
+			p.Gateways[gatewayKey] = pg
+			p.mu.Unlock()
+		} else {
+			pg = p.Gateways[gatewayKey]
+		}
+
+		// rewrite request URL to API Gateway endpoint URL
+		gatewayEndpoint := pg.GetEndpoint()
+		req.URL.Path = filepath.Join("/", proxygateway.StageName, req.URL.Path)
+		req.URL.Host = gatewayEndpoint.Host
+		req.URL.Scheme = gatewayEndpoint.Scheme
+		req.Host = gatewayEndpoint.Host
+	}
+
+	if p.Options.Verbose {
+		client.Transport = dump.RoundTripper(tr)
+	}
+
+	retryablehttpClient := mubeng.ToRetryableHTTPClient(client)
+	retryablehttpClient.RetryMax = p.Options.MaxRetries
+	retryablehttpClient.RetryWaitMin = client.Timeout
+	retryablehttpClient.RetryWaitMax = client.Timeout
+	retryablehttpClient.Logger = ReleveledLogo{
+		Logger:  log,
+		Request: req,
+		Verbose: p.Options.Verbose,
+	}
+
+	return retryablehttpClient, nil
+}
+
 // nonProxy handles non-proxy requests
 func nonProxy(w http.ResponseWriter, req *http.Request) {
 	if common.Version != "" {
@@ -151,4 +300,8 @@ func nonProxy(w http.ResponseWriter, req *http.Request) {
 	}
 
 	http.Error(w, "This is a mubeng proxy server. Does not respond to non-proxy requests.", 500)
+}
+
+func serverErr(req *http.Request) *http.Response {
+	return goproxy.NewResponse(req, mime, http.StatusBadGateway, "Proxy server error")
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/inconshreveable/go-update"
 	"github.com/logrusorgru/aurora"
 	"github.com/projectdiscovery/gologger"
-	"ktbs.dev/mubeng/common"
+	"github.com/mubeng/mubeng/common"
 )
 
 // New to initialize updater, such as:
@@ -96,10 +96,5 @@ func doUpdate(ver string) error {
 	}
 	defer resp.Body.Close()
 
-	err = update.Apply(resp.Body, opt)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return update.Apply(resp.Body, opt)
 }

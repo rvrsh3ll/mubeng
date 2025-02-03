@@ -6,20 +6,19 @@
 <h4 align="center">An incredibly fast proxy checker & IP rotator with ease.</h4>
 
 <p align="center">
-	<a href="#"><img src="https://img.shields.io/badge/kitabisa-security%20project-blue"></a>
 	<a href="https://golang.org"><img src="https://img.shields.io/badge/made%20with-Go-brightgreen"></a>
-	<a href="https://goreportcard.com/report/ktbs.dev/mubeng"><img src="https://goreportcard.com/badge/ktbs.dev/mubeng"></a>
-	<a href="https://github.com/kitabisa/mubeng/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-yellowgreen"></a>
+	<a href="https://goreportcard.com/report/github.com/mubeng/mubeng"><img src="https://goreportcard.com/badge/github.com/mubeng/mubeng"></a>
+	<a href="https://github.com/mubeng/mubeng/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-yellowgreen"></a>
 	<a href="#"><img src="https://img.shields.io/badge/platform-osx%2Flinux%2Fwindows-green"></a>
-	<a href="https://github.com/kitabisa/mubeng/releases"><img src="https://img.shields.io/github/release/kitabisa/mubeng"></a>
-	<a href="https://github.com/kitabisa/mubeng/issues"><img src="https://img.shields.io/github/issues/kitabisa/mubeng"></a>
+	<a href="https://github.com/mubeng/mubeng/releases"><img src="https://img.shields.io/github/release/mubeng/mubeng"></a>
+	<a href="https://github.com/mubeng/mubeng/issues"><img src="https://img.shields.io/github/issues/mubeng/mubeng"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/kitabisa/mubeng/blob/master/.github/CONTRIBUTING.md">Contributing</a> •
-  <a href="https://github.com/kitabisa/mubeng/blob/master/CHANGELOG.md">What's new</a> •
-  <a href="https://pkg.go.dev/ktbs.dev/mubeng/pkg/mubeng">Documentation</a> •
-  <a href="https://github.com/kitabisa/mubeng/issues/new/choose">Report Issues</a>
+  <a href="https://github.com/mubeng/mubeng/blob/master/.github/CONTRIBUTING.md">Contributing</a> •
+  <a href="https://github.com/mubeng/mubeng/blob/master/CHANGELOG.md">What's new</a> •
+  <a href="https://pkg.go.dev/github.com/mubeng/mubeng/pkg/mubeng">Documentation</a> •
+  <a href="https://github.com/mubeng/mubeng/issues/new/choose">Report Issues</a>
 </p>
 
 ---
@@ -40,6 +39,9 @@
     - [Proxy IP rotator](#proxy-ip-rotator)
       - [Burp Suite Upstream Proxy](#burp-suite-upstream-proxy)
       - [OWASP ZAP Proxy Chain](#owasp-zap-proxy-chain)
+    - [Proxy format](#proxy-format)
+    	- [Templating](#templating)
+    	- [Amazon API Gateway](#amazon-api-gateway)
 - [Limitations](#limitations)
 	- [Known Bugs](#known-bugs)
 - [Contributors](#contributors)
@@ -51,13 +53,13 @@
 
 # Features
 
-- **Proxy IP rotator**: Rotates your IP address for every specific request.
-- **Proxy checker**: Check your proxy IP which is still alive.
-- **All HTTP/S methods** are supported.
-- **HTTP, SOCKS v4(A) & v5** proxy protocols apply.
-- **All parameters & URIs are passed**.
-- **Easy to use**: You can just run it against your proxy file, and choose the action you want!
-- **Cross-platform**: whether you are Windows, Linux, Mac, or even Raspberry Pi, you can run it very well.
+- **Proxy IP rotator**: Rotates your IP address for every specified request.
+- **Proxy checker**: Verifies the availability of your proxy IPs.
+- **Supports all HTTP/S methods**.
+- **Compatible with HTTP, SOCKS v4(A), v5, and Amazon API Gateway** proxy protocols.
+- **Passes all parameters and URIs**.
+- **User-friendly**: Simply run it against your proxy file and select the desired action.
+- **Cross-platform**: Runs seamlessly on Windows, Linux, Mac, and even Raspberry Pi.
 
 # Why mubeng?
 
@@ -77,43 +79,42 @@ So, you don't need any extra proxy checking tools out there if you want to check
 
 ## Binary
 
-Simply, download a pre-built binary from [releases page](https://github.com/kitabisa/mubeng/releases) and run!
+Simply, download a pre-built binary from [releases page](https://github.com/mubeng/mubeng/releases) and run!
 
 ## Docker
 
 Pull the [Docker](https://docs.docker.com/get-docker/) image by running:
 
 ```bash
-▶ docker pull kitabisa/mubeng
+▶ docker pull ghcr.io/mubeng/mubeng:latest
 ```
 
 ## Source
 
-Using [Go _(v1.15+)_](https://golang.org/doc/install) compiler:
+Using [Go](https://golang.org/doc/install) compiler:
 
 ```bash
-▶ GO111MODULE=on go get -u ktbs.dev/mubeng/cmd/mubeng
+▶ go install -v github.com/mubeng/mubeng@latest
 ```
-
-<table>
-	<td><b>NOTE:</b> The same command above also works for updating.</td>
-</table>
 
 ### — or
 
 Manual building executable from source code:
 
 ```bash
-▶ git clone https://github.com/kitabisa/mubeng
+▶ git clone https://github.com/mubeng/mubeng
 ▶ cd mubeng
 ▶ make build
-▶ (sudo) mv ./bin/mubeng /usr/local/bin
-▶ make clean
+▶ (sudo) install ./bin/mubeng /usr/local/bin
 ```
 
 # Usage
 
 For usage, it's always required to provide your proxy list, whether it is used to check or as a proxy pool for your proxy IP rotation.
+
+<center>
+  <a href="#"><img alt="kitabisa mubeng" src="https://github.com/user-attachments/assets/3c19e328-cfd7-43f7-bf83-b3996671fc67" width="80%"></a>
+</center>
 
 ## Basic
 
@@ -130,21 +131,31 @@ Here are all the options it supports.
 ```
 
 | **Flag**                      	| **Description**                                              	|
-|-------------------------------	|--------------------------------------------------------------	|
-| -f, --file `<FILE>`           	| Proxy file.                                                  	|
-| -a, --address `<ADDR>:<PORT>` 	| Run proxy server.                                            	|
-| -A, --auth `<USER>:<PASS>`    	| Set authorization for proxy server.                           |
-| -d, --daemon                  	| Daemonize proxy server.                                       |
-| -c, --check                   	| To perform proxy live check.                                 	|
-|     --only-cc `<AA>,<BB>`     	| Only show specific country code (comma separated).            |
-| -t, --timeout                 	| Max. time allowed for proxy server/check (default: 30s).      |
-| -r, --rotate `<AFTER>`        	| Rotate proxy IP for every `AFTER` request (default: 1).       |
-| -m, --method `<METHOD>`       	| Rotation method (sequent/random) (default: sequent).          |
-| -s, --sync                    	| Sync will wait for the previous request to complete.          |
-| -v, --verbose                 	| Dump HTTP request/responses or show died proxy on check.      |
-| -o, --output <FILE>           	| Save output from proxy server or live check.                  |
-| -u, --update                  	| Update mubeng to the latest stable version.                   |
-| -V, --version                 	| Show current mubeng version.                                  |
+|-------------------------------  |-------------------------------------------------------------- |
+| -f, --file `<FILE>`             | Proxy file.                                                   |
+| -a, --address `<ADDR>:<PORT>`   | Run proxy server.                                             |
+| -A, --auth `<USER>:<PASS>`      | Set authorization for proxy server.                           |
+| -d, --daemon                    | Daemonize proxy server.                                       |
+| -c, --check                     | To perform proxy live check.                                  |
+| -g, --goroutine `<N>`           | Max. goroutine to use (default: 50).                          |
+|     --only-cc `<AA>,<BB>`       | Only show specific country code (comma separated).            |
+| -t, --timeout                   | Max. time allowed for proxy server/check (default: 30s).      |
+| -r, --rotate `<AFTER>`          | Rotate proxy IP for every `AFTER` request (default: 1).       |
+|     --rotate-on-error           | Rotate proxy IP and retry failed HTTP requests.               |
+|     --remove-on-error           | Remove proxy IP from proxy pool on failed HTTP requests.      |
+|     --max-errors `<N>`          | Max. errors allowed during rotation (default: 3).             |
+|                                 | Use this with `--rotate-on-error`.                            |
+|                                 | If value is less than 0 (e.g., -1), rotation will             |
+|                                 | continue indefinitely.                                        |
+|     --max-redirs `<N>`          | Max. redirects allowed (default: 10).                         |
+|     --max-retries `<N>`         | Max. retries for failed HTTP requests (default: 0).           |
+| -m, --method `<METHOD>`         | Rotation method (sequent/random) (default: sequent).          |
+| -s, --sync                      | Sync will wait for the previous request to complete.          |
+| -v, --verbose                   | Dump HTTP request/responses or show died proxy on check.      |
+| -o, --output `<FILE>`           | Save output from proxy server or live check.                  |
+| -u, --update                    | Update mubeng to the latest stable version.                   |
+| -w, --watch                     | Watch proxy file, live-reload from changes.                   |
+| -V, --version                   | Show current mubeng version.                                  |
 
 <table>
 	<td>
@@ -176,6 +187,13 @@ Here are all the options it supports.
 					<li>Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", and "h".</li>
 				</ul>
 			</li>
+			<li>The max. errors <code>(--max-errors)</code> ≠ max. retries <code>(--max-retries)</code>.</li>
+			<ul>
+					<li>The max. retries <code>(--max-retries)</code> apply to retrying a failed HTTP request with the same proxy.</li>
+					<li>Meanwhile, max. errors <code>(--max-errors)</code> refer to the total failed HTTP requests from the proxies used.</li>
+					<li>For example, once the max. retries <code>(--max-retries)</code> are reached <i>(if supplied)</i>, the error is counted, and the proxy IP will rotate for the same failed HTTP request until the max. errors <code>(--max-errors)</code> are reached, whereas max. retries <code>(--max-retries)</code> <b>DO NOT</b> trigger a proxy rotation.</li>
+				</ul>
+			<li>If the value of max. errors <code>(--max-errors)</code> is less than <b>0</b> (e.g. <b>-1</b>), rotation will continue indefinitely.</li>
 		</ul>
 	</td>
 </table>
@@ -193,6 +211,7 @@ For example, you've proxy pool `(proxies.txt)` as:
 <table>
 	<td>
 		<pre>http://127.0.0.1:8080
+https://127.0.0.1:443
 socks4://127.0.0.1:4145
 socks5://127.0.0.1:2121
 ...
@@ -201,7 +220,7 @@ socks5://127.0.0.1:2121
 </table>
 
 > Because we use auto-switch transport, `mubeng` can accept multiple proxy protocol schemes at once.<br>
-> Please refer to [documentation](https://pkg.go.dev/ktbs.dev/mubeng/pkg/mubeng#Transport) for this package.
+> Please refer to [documentation](https://pkg.go.dev/github.com/mubeng/mubeng/pkg/mubeng#Transport) for this package.
 
 ### Proxy checker
 
@@ -214,7 +233,7 @@ Pass `--check` flag in command to perform proxy checks:
 The above case also uses `--output` flag to save a live proxy of specific country code with `--only-cc` flag (`ISO-3166` alpha-2) into file _(live.txt)_ from checking result.
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/25837540/108407803-cd2d8b00-7256-11eb-8560-f0c99042c970.png">
+  <img src="https://github.com/user-attachments/assets/97b9e5ad-64bd-403a-bd3a-1bc4eb7fb3f1" height="400"><br />
   <i>(Figure: Checking proxies mubeng with max. 5s timeout)</i>
 </p>
 
@@ -229,7 +248,7 @@ Furthermore, if you wish to do proxy IP rotator from proxies that are still aliv
 The `-r` _(--rotate)_ flag works to rotate your IP for every _N_ request value you provide `(10)`, and the `-m` _(--method)_ flag will rotate the proxy sequential/randomly.
 
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/25837540/108269526-b3ca0780-71a0-11eb-986c-f8e98bab8433.jpg">
+  <img src="https://github.com/user-attachments/assets/b86a5bf4-41e6-43ac-8077-9f82442e9577">
   <i>(Figure: Running mubeng as proxy IP rotator with verbose mode)</i>
 </p>
 
@@ -256,17 +275,110 @@ It acts the same way when you using an upstream proxy. OWASP ZAP allows you to c
 
 Select **Tools** in the menu bar in your ZAP session window, then select the **Options** _(shortcut: Ctrl+Alt+O)_ submenu, and go to **Connection** section. In that window, scroll to **Use proxy chain** part then check **Use an outgoing proxy server**. After that, fill required columns _(Address/Domain Name & Port)_ with correct details. Click **OK** to save settings.
 
+### Proxy format
+
+Currently mubeng supports HTTP(S) & SOCKSv4(A)/v5 protocol, see [examples](#examples) above. But, not limited by that we also support proxy string substitution and helper functions for your proxy pool.
+
+#### Templating
+
+If you have an authenticated proxy, you definitely don't want to write credentials constantly to the proxy pool file. **mubeng** can evaluate environment variable with `{{VARIABLE}}` writing style.
+
+For example:
+
+1. String substitute
+
+```console
+$ export USERNAME="FOO"
+$ export PASSWORD="BAR"
+$ echo "http://{{USERNAME}}:{{PASSWORD}}@192.168.0.1:31337" > list.txt
+$ mubeng -f list.txt -a :8080
+```
+
+2. Helper function
+
+Available functions currently supported:
+
+- `uint32`, and
+- `uint32n N`.
+
+Those following above functions are thread-safe pseudo-randomness.
+
+As an example of its use, we will be utilizing stream isolation over Tor SOCKS. With this method, you just need one Tor instance and each request can use a different stream with a different exit node, but that doesn't guarantee that your _ass_ will be rotated. Thus, we have to create unique `USER:PASS` pair to isolate streams for every connection. In order to pass pseudo-random proxy authorization, use `uint32` or `uint32n` function on your proxy pool, like:
+
+```console
+$ echo "socks5://{{uint32}}:{{uint32}}@127.0.0.1:9050" > list.txt
+$ while :; do mubeng -f list.txt -c 2>/dev/null; done
+[LIVE] [XX] [23.**.177.2] socks5://2123347975:3094119616@127.0.0.1:9050
+[LIVE] [XX] [199.**.253.156] socks5://1646373938:2740927425@127.0.0.1:9050
+[LIVE] [XX] [185.**.101.137] socks5://814036283:1382144874@127.0.0.1:9050
+[LIVE] [XX] [185.**.83.83] socks5://2895805939:2276057153@127.0.0.1:9050
+[LIVE] [XX] [103.**.167.10] socks5://408584795:1244204083@127.0.0.1:9050
+[LIVE] [XX] [198.**.84.99] socks5://3015151335:251835794@127.0.0.1:9050
+[LIVE] [XX] [179.**.159.197] socks5://3952852758:324998250@127.0.0.1:9050
+^C
+```
+
+#### Amazon API Gateway
+
+The mubeng proxy rotator also supports integration with Amazon API Gateway. This allows you to route traffic through multiple AWS regions for enhanced redundancy and geographic distribution.
+
+Format for AWS proxy strings:
+
+```
+aws://AWS_ACCESS_KEY_ID:AWS_SECRET_ACCESS_KEY@REGION
+```
+
+> [!TIP]
+> Since it uses a custom parser, the AWS secret access key (or any other parts) can be quoted for better readability. Example: `aws://AKIAIOSFODNN7EXAMPLE:"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"@us-west-1`.
+> 
+> This quoting feature only works for the **`aws`** protocol scheme.
+
+To get started, you'll need to:
+
+1. Export your AWS credentials as environment variables
+
+```bash
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" 
+```
+
+2. Create a proxy list file containing AWS regions
+
+Generate proxy entries for multiple AWS regions:
+
+```bash
+echo "aws://{{AWS_ACCESS_KEY_ID}}:{{AWS_SECRET_ACCESS_KEY}}@"{us,eu}"-"{east,west}"-"{1,2} | tr ' ' '\n' > list.txt
+```
+
+This will create entries for regions like:
+
+* `aws://{{AWS_ACCESS_KEY_ID}}:{{AWS_SECRET_ACCESS_KEY}}@us-east-1`
+* `aws://{{AWS_ACCESS_KEY_ID}}:{{AWS_SECRET_ACCESS_KEY}}@us-east-2`
+* `aws://{{AWS_ACCESS_KEY_ID}}:{{AWS_SECRET_ACCESS_KEY}}@us-west-1`
+* ...
+
+3. Start mubeng proxy server pointing to your AWS proxy list:
+
+```bash
+$ mubeng -f list.txt -a :8080
+```
+
+This setup enables mubeng to automatically rotate traffic through multiple AWS regions via API Gateway. When running the proxy server, mubeng will dynamically substitute your AWS credentials from environment variables using the [templating](#templating) feature described above.
+
+> [!NOTE]
+> Ensure your AWS credentials have the appropriate permissions to access API Gateway in the specified regions.
+
 # Limitations
 
-Currently IP rotation runs the proxy server only as an HTTP protocol, not a SOCKSv4/v5 protocol, even though the resource you have is SOCKSv4/v5. In other words, the SOCKSv4/v5 resource that you provide is used properly because it uses auto-switch transport on the client, but this proxy server **DOES NOT** switch to anything other than HTTP protocol.
+Currently IP rotation runs the proxy server only as an HTTP protocol, not a SOCKSv4(A)/v5 protocol, even though the resource you have is SOCKSv4(A)/v5. In other words, the SOCKSv4(A)/v5 resource that you provide is used properly because it uses auto-switch transport on the client, but this proxy server **DOES NOT** switch to anything other than HTTP protocol.
 
 # Contributors
 
-[![contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/kitabisa/mubeng/issues)
+[![contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/mubeng/mubeng/issues)
 
-This project exists thanks to all the people who contribute. To learn how to setup a development environment and for contribution guidelines, see [CONTRIBUTING.md](https://github.com/kitabisa/mubeng/blob/master/.github/CONTRIBUTING.md).
+This project exists thanks to all the people who contribute. To learn how to setup a development environment and for contribution guidelines, see [CONTRIBUTING.md](https://github.com/mubeng/mubeng/blob/master/.github/CONTRIBUTING.md).
 
-<a href="https://github.com/kitabisa/mubeng/graphs/contributors">
+<a href="https://github.com/mubeng/mubeng/graphs/contributors">
 	<img src=".github/CONTRIBUTORS.svg">
 </a>
 
@@ -276,8 +388,8 @@ This project exists thanks to all the people who contribute. To learn how to set
 
 # Changes
 
-For changes, see [CHANGELOG.md](https://github.com/kitabisa/mubeng/blob/master/CHANGELOG.md).
+For changes, see [CHANGELOG.md](https://github.com/mubeng/mubeng/blob/master/CHANGELOG.md).
 
 # License
 
-This program is free software: you can redistribute it and/or modify it under the terms of the [Apache license](https://github.com/kitabisa/mubeng/blob/master/LICENSE). Kitabisa mubeng and any contributions are Copyright © by Dwi Siswanto 2021.
+This program is free software: you can redistribute it and/or modify it under the terms of the [Apache license](https://github.com/mubeng/mubeng/blob/master/LICENSE). mubeng and any contributions are copyright © by Dwi Siswanto 2021-2025.

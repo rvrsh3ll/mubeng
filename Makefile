@@ -9,7 +9,8 @@ mubeng: test build
 
 test:
 	@echo "Testing ${APP_NAME} package ${VERSION}"
-	@go test -short ktbs.dev/mubeng/pkg/mubeng
+	@go test -short github.com/mubeng/mubeng/pkg/mubeng
+	@go test -short github.com/mubeng/mubeng/pkg/helper
 
 test-extra: golangci-lint test
 
@@ -17,7 +18,7 @@ build:
 	@echo "Building ${APP_NAME} ${VERSION}"
 	@echo "GOPATH=${GOPATH}"
 	@mkdir -p bin/
-	@go build -ldflags "-s -w -X ktbs.dev/mubeng/common.Version=${VERSION}" -o ./bin/${APP_NAME} ./cmd/${APP_NAME}
+	@go build -ldflags "-s -w -X github.com/mubeng/mubeng/common.Version=${VERSION}" -o ./bin/${APP_NAME} .
 
 
 golangci-lint:

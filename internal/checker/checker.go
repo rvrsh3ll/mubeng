@@ -3,14 +3,16 @@ package checker
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+	"io"
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
+	"github.com/mubeng/mubeng/common"
+	"github.com/mubeng/mubeng/pkg/helper"
+	"github.com/mubeng/mubeng/pkg/mubeng"
 	"github.com/logrusorgru/aurora"
-	"ktbs.dev/mubeng/common"
-	"ktbs.dev/mubeng/pkg/mubeng"
+	"github.com/sourcegraph/conc/pool"
 )
 
 // Do checks proxy from list.
@@ -18,14 +20,17 @@ import (
 // Displays proxies that have died if verbose mode is enabled,
 // or save live proxies into user defined files.
 func Do(opt *common.Options) {
+	p := pool.New().WithMaxGoroutines(opt.Goroutine)
+	c := retryablehttp.NewClient()
+	c.RetryMax = opt.MaxRetries
+	c.Logger = nil
+
 	for _, proxy := range opt.ProxyManager.Proxies {
-		wg.Add(1)
+		address := helper.EvalFunc(proxy)
 
-		go func(address string) {
-			defer wg.Done()
-
-			cc, err := check(address, opt.Timeout)
-			if len(opt.Countries) > 0 && !isMatchCC(opt.Countries, cc) {
+		p.Go(func() {
+			addr, err := check(c, address, opt.Timeout)
+			if len(opt.Countries) > 0 && !isMatchCC(opt.Countries, addr.Country) {
 				return
 			}
 
@@ -34,16 +39,20 @@ func Do(opt *common.Options) {
 					fmt.Printf("[%s] %s\n", aurora.Red("DIED"), address)
 				}
 			} else {
-				fmt.Printf("[%s] [%s] %s\n", aurora.Green("LIVE"), aurora.Magenta(cc), address)
+				fmt.Printf(
+					"[%s] [%s] [%s] %s (%s)\n",
+					aurora.Green("LIVE"), aurora.Magenta(addr.Country),
+					aurora.Cyan(addr.IP), address, aurora.Yellow(addr.Duration),
+				)
 
 				if opt.Output != "" {
 					fmt.Fprintf(opt.Result, "%s\n", address)
 				}
 			}
-		}(proxy)
+		})
 	}
 
-	wg.Wait()
+	p.Wait()
 }
 
 func isMatchCC(cc []string, code string) bool {
@@ -60,15 +69,16 @@ func isMatchCC(cc []string, code string) bool {
 	return false
 }
 
-func check(address string, timeout time.Duration) (string, error) {
-	req, err := http.NewRequest("GET", endpoint, nil)
+func check(c *retryablehttp.Client, address string, timeout time.Duration) (IPInfo, error) {
+	req, err := retryablehttp.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		return "", err
+		return ipinfo, err
 	}
+	req.Header.Add("Connection", "close")
 
 	tr, err := mubeng.Transport(address)
 	if err != nil {
-		return "", err
+		return ipinfo, err
 	}
 
 	proxy := &mubeng.Proxy{
@@ -76,26 +86,34 @@ func check(address string, timeout time.Duration) (string, error) {
 		Transport: tr,
 	}
 
-	client, req = proxy.New(req)
-	client.Timeout = timeout
-	req.Header.Add("Connection", "close")
-
-	resp, err := client.Do(req)
+	client, err := proxy.New(req.Request)
 	if err != nil {
-		return "", err
+		return ipinfo, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	c.HTTPClient = client
+	c.HTTPClient.Timeout = timeout
+
+	start := time.Now()
+	resp, err := c.Do(req)
 	if err != nil {
-		return "", err
+		return ipinfo, err
+	}
+	duration := time.Since(start)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ipinfo, err
 	}
 
-	err = json.Unmarshal([]byte(body), &myip)
+	err = json.Unmarshal(body, &ipinfo)
 	if err != nil {
-		return "", err
+		return ipinfo, err
 	}
+	ipinfo.Duration = duration.Truncate(time.Millisecond)
 
 	defer resp.Body.Close()
+	defer tr.CloseIdleConnections()
 
-	return myip.CC, nil
+	return ipinfo, nil
 }

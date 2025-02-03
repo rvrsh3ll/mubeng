@@ -6,7 +6,7 @@ import (
 
 	"github.com/kardianos/service"
 	"github.com/projectdiscovery/gologger"
-	"ktbs.dev/mubeng/common"
+	"github.com/mubeng/mubeng/common"
 )
 
 // New to initialize mubeng in daemon
@@ -28,6 +28,10 @@ func New(opt *common.Options) error {
 
 	if opt.Verbose {
 		args = append(args, "-v")
+	}
+
+	if opt.Watch {
+		args = append(args, "-w")
 	}
 
 	o := make(service.KeyValue)

@@ -1,14 +1,7 @@
 package checker
 
-import (
-	"net/http"
-	"sync"
-)
-
 var (
-	client *http.Client
-	myip   myIP
-	wg     sync.WaitGroup
+	ipinfo IPInfo
 
-	endpoint = "https://api.myip.com/"
+	endpoint = "https://ipinfo.io/json"
 )
